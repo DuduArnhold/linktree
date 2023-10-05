@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useEffect } from "react";
 import { Header } from "../../components/header";
 import { Input } from "../../components/input";
 import { FiTrash } from "react-icons/fi"
@@ -16,6 +16,16 @@ import {
 
 } from "firebase/firestore"
 
+
+
+interface linkProps{
+    id: string;
+    name: string;
+    url: string;
+    bg: string;
+    color: string;
+}
+
 export function Admin(){
 
     const [nameInput, setNameInput] = useState("")
@@ -23,11 +33,65 @@ export function Admin(){
     const [textColorInput, setTextColorInput] = useState("#F1F1F1")
     const [bgColorInput, setBgColorInput] = useState("#121212")
 
+    const [links, setLinks] = useState<linkProps[]>([])
 
-    async function handleRegister(e: FormEvent){
+    useEffect(() => {
+        const linksRef = collection(db, 'links');
+        const queryRef = query(linksRef, orderBy("created", "asc"));
+
+        const unsub = onSnapshot(queryRef, (snapshot) => {
+            let lista = [] as linkProps[];
+            
+            snapshot.forEach((doc) => {
+                lista.push({
+                    id: doc.id,
+                    name: doc.data().name,
+                    url: doc.data().url,
+                    bg: doc.data().bg,
+                    color:doc.data().txtcolor,
+
+                })
+            })
+
+            setLinks(lista);
+
+        });
+
+        return () =>{unsub();};
+
+    }, []);
+
+
+     function handleRegister(e: FormEvent){
         e.preventDefault();
 
-        alert("teste")
+        if(nameInput === "" || url === ""){
+            alert("Preencha todos os campos!")
+            return;
+        }
+
+        addDoc(collection(db, "links"),{
+            name: nameInput,
+            url: url,
+            bg: bgColorInput,
+            txtcolor: textColorInput,
+            created: new Date()
+        })
+        .then(() => {
+            setNameInput("");
+            setUrl("");
+            console.log("Cadastrado com sucesso!")
+        })
+        .catch((error) => {
+            console.log("Erro ao cadastrar no banco de dados" + error)
+        })
+    }
+
+
+    async function handleDeleteLink(id: string){
+        const docRef = doc(db, "links", id)
+
+        await deleteDoc(docRef);
     }
 
     return(
@@ -107,19 +171,21 @@ export function Admin(){
                 className="font-bold text-white mb-4 text-2xl"
             >Meus Links</h2>
 
-            <article className="flex items-center justify-between w-11/12 max-w-xl
-                rounded py-3 px-2 mb-2 select-none
-            "
-                    style={{backgroundColor: "#2563EB", color: "#000"}}
-            >
-                <p>Canal do Youtube</p>
-                <div>
-                    <button
-                        className="border border-dashed py-1 px-2 rounded"
-                    ><FiTrash size={18} color="#FFF"/></button>
-                    </div>
-            </article>
-
+            {links.map((link) => (
+                <article 
+                    key={link.id}
+                    className="flex items-center justify-between w-11/12 max-w-xl
+                                rounded py-3 px-2 mb-2 select-none"
+                    style={{backgroundColor: link.bg, color: link.color}}>
+                            <p>{link.name}</p>
+                            <div>
+                                <button
+                                    onClick={() => handleDeleteLink(link.id)}
+                                    className="border border-dashed py-1 px-2 rounded"
+                                ><FiTrash size={18} color="#FFF"/></button>
+                            </div>
+                </article>
+            ))}
 
         </div>
     )
